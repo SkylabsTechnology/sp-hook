@@ -249,7 +249,7 @@ const CLS_AppendStyles = function () {
         window.parent.document.head.appendChild(styleTag);
     }
 
-    const localHead = document.head.querySelector('style[cls-local-style="true"]');
+    const localHead = window.parent.document.head.querySelector('style[cls-local-style="true"]');
     if (!localHead) {
         const localStyleTag = document.createElement('style');
         localStyleTag.setAttribute('cls-local-style', 'true');
