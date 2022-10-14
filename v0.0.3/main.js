@@ -249,15 +249,57 @@ const CLS_AppendStyles = function () {
         window.parent.document.head.appendChild(styleTag);
     }
 
-    const localHead = window.parent.document.head.querySelector('style[cls-local-style="true"]');
+    const localHead = document.head.querySelector('style[cls-local-style="true"]');
     if (!localHead) {
         const localStyleTag = document.createElement('style');
         localStyleTag.setAttribute('cls-local-style', 'true');
         localStyleTag.innerHTML = `
          /* CLS STYLE FIXES */
+
+         /* Shape Petal Button */
+         .primary-button-shape-petal .sqs-block-button:has([class*="sqs-button-element--primary"]) {
+            border-radius: 16px 0;
+         }
          .secondary-button-shape-petal .sqs-block-button:has([class*="sqs-button-element--secondary"]) {
             border-radius: 16px 0;
          }
+         .tertiary-button-shape-petal .sqs-block-button:has([class*="sqs-button-element--tertiary"]) {
+            border-radius: 16px 0;
+         }
+
+         /* Shape Rounded Button */
+         .primary-button-shape-rounded .sqs-block-button:has([class*="sqs-button-element--primary"]) {
+            border-radius: 0.4rem;
+         }
+         .secondary-button-shape-rounded .sqs-block-button:has([class*="sqs-button-element--secondary"]) {
+            border-radius: 0.4rem;
+         }
+         .tertiary-button-shape-rounded .sqs-block-button:has([class*="sqs-button-element--tertiary"]) {
+            border-radius: 0.4rem;
+         }
+
+         /* Shape Pill Button */
+         .primary-button-shape-pill .sqs-block-button:has([class*="sqs-button-element--primary"]) {
+            border-radius: 300px;
+         }
+         .secondary-button-shape-pill .sqs-block-button:has([class*="sqs-button-element--secondary"]) {
+            border-radius: 300px;
+         }
+         .tertiary-button-shape-pill .sqs-block-button:has([class*="sqs-button-element--tertiary"]) {
+            border-radius: 300px;
+         }
+
+         /* Shape Oval Button */
+         .primary-button-shape-oval .sqs-block-button:has([class*="sqs-button-element--primary"]) {
+            border-radius: 100%;
+         }
+         .secondary-button-shape-oval .sqs-block-button:has([class*="sqs-button-element--secondary"]) {
+            border-radius: 100%;
+         }
+         .tertiary-button-shape-oval .sqs-block-button:has([class*="sqs-button-element--tertiary"]) {
+            border-radius: 100%;
+         }
+
          /* CLS STYLES */
          .cls-blur-button {
              filter: blur(1px);
@@ -270,18 +312,15 @@ const CLS_AppendStyles = function () {
          }
          /* CLS ANIMATIONS */
          .cls-shake-button-on-hover:hover {
-             animation: shake-button 1s ease-in-out;
+             animation: animate-shake-button 1s ease-in-out;
          }
-         .cls-pulse-button-infinite {
-            animation: animate-pulse 1.3s infinite ease-in-out;
+         .cls-pulse-button-infinite:has([class*="sqs-button-element--secondary"]) {
+            animation: animate-pulse-accent 1.3s infinite ease-in-out;
          }
-         .cls-pulse-button-infinite {
-            
+         .cls-pulse-button-infinite:has([class*="sqs-button-element--secondary"]).cls-shake-button-on-hover:hover {
+            animation: animate-pulse-accent 1.3s infinite ease-in-out, animate-shake-button 1s ease-in-out;
          }
-         .cls-pulse-button-infinite.cls-shake-button-on-hover:hover {
-            animation: animate-pulse 1.3s infinite ease-in-out, shake-button 1s ease-in-out;
-         }
-         @keyframes shake-button {
+         @keyframes animate-shake-button {
              10% { transform: translate3d(-1px, 0, 0); offset: 0.1; }
              20% { transform: translate3d(2px, 0, 0); offset: 0.2; }
              30% { transform: translate3d(-3px, 0, 0); offset: 0.3; }
@@ -292,7 +331,7 @@ const CLS_AppendStyles = function () {
              80% { transform: translate3d(2px, 0, 0); offset: 0.8; }
              90% { transform: translate3d(-1px, 0, 0); offset: 0.9; }
          }
-         @keyframes animate-pulse {
+         @keyframes animate-pulse-accent {
             0% {
                 transform: scale(0.98);
                 box-shadow: 0 0 0 0 hsla(var(--safeLightAccent-hsl), 0.8);
@@ -307,7 +346,7 @@ const CLS_AppendStyles = function () {
                 transform: scale(0.98);
                 box-shadow: 0 0 0 0 hsla(var(--safeLightAccent-hsl), 0);
             }
-        }`;
+         }`;
         document.head.appendChild(localStyleTag);
     }
 }
