@@ -26,6 +26,17 @@ const CLS_SetItems = function (key, value) {
     CLS_HandleSaveButtonAddRemove();
 }
 
+const CLS_ValidateLocalStorage = function () {
+    let dbItems = localStorage.getItem(cls_currentSavedItemsCacheKey);
+    let savedItems = localStorage.getItem(cls_itemsToSaveCacheKey);
+    if(!dbItems) {
+        localStorage.setItem(cls_currentSavedItemsCacheKey, "[]");
+    }
+    if(!savedItems) {
+        localStorage.setItem(cls_itemsToSaveCacheKey, "[]");
+    }
+}
+
 /**
  * Adds styles to the global and iframe DOMs
  */
@@ -36,6 +47,21 @@ const CLS_AppendStyles = function () {
         styleTag.setAttribute('cls-parent-styles', 'true');
         styleTag.innerHTML = `
          /* GLOBALS SQUARESPACE EMULATION */
+         div.cls-item-list::-webkit-scrollbar {
+             width: 6px;
+         }
+         div.cls-item-list::-webkit-scrollbar-track {
+             box-shadow: inset 0 0 5px rgba(255,255,255, .3); 
+         }
+         div.cls-item-list::-webkit-scrollbar-thumb {
+             background: #a891eb; 
+         }
+         div.cls-item-list::-webkit-scrollbar-thumb:hover {
+             background: #9a84d9; 
+         }
+         div.cls-item-list {
+            scrollbar-width: thin;
+         }
          .cls-sp-toggle-outer-wrapper {
              margin-left: 22px;
              margin-right: 22px;
@@ -128,7 +154,7 @@ const CLS_AppendStyles = function () {
              align-items: center;
          }
          .cls-sp-toggle.cls-sp-toggle-checked {
-             background-color: rgb(142, 70, 163);
+             background-color: rgba(180, 159, 220, 1);
          }
          .cls-sp-toggle.cls-sp-toggle-checked .cls-sp-toggle-input{
              right: 0;
@@ -186,13 +212,13 @@ const CLS_AppendStyles = function () {
              justify-content: center;
              align-items: center;
              margin: 0 10px!important;
-             background: rgba(184, 163, 239, 1);
+             background: rgba(180, 159, 220, 1);
              padding: 10px 24px!important;
              width: 100%;
              color: #fff;
              border-radius: 4px;
              box-shadow: 0px 7px 0px 0px rgb(0 0 0);
-             animation: fade-out-save-background 1s 4 ease-in-out;
+             animation: fade-out-save-background 1s infinite ease-in-out;
              transition: all 280ms cubic-bezier(.4, 0, .2, 1);
              position: relative;
              z-index: 10;
@@ -203,7 +229,7 @@ const CLS_AppendStyles = function () {
              box-shadow: 0 0 0 0 rgb(0 0 0);
          }
          button.cls-save-button:hover {
-             background: #a891eb;
+             background: rgba(179, 156, 224, 1);
          }
          .cls-save-button-background {
              display: flex;
@@ -241,15 +267,16 @@ const CLS_AppendStyles = function () {
              100% { opacity: 0; }
          }
          @keyframes fade-out-save-background {
-             10% { background: rgba(184, 163, 239, 1); }
-             90% { background: rgba(184, 163, 239, 0); }
+             0% {transform: scale(0.98); box-shadow: 0 0 0 0 rgba(0, 0, 0, .8); }
+             70% {transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 0, 0, 0); }
+             100% { transform: scale(0.98); box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
          }
          `;
-
         window.parent.document.head.appendChild(styleTag);
     }
 
     const localHead = window.parent.document.head.querySelector('style[cls-local-style="true"]');
+    const localMaterialHead = window.parent.document.head.querySelector('style[cls-material-local-style="true"]');
     if (!localHead) {
         const localStyleTag = document.createElement('style');
         localStyleTag.setAttribute('cls-local-style', 'true');
@@ -300,54 +327,385 @@ const CLS_AppendStyles = function () {
             border-radius: 100%;
          }
 
-         /* CLS STYLES */
-         .cls-blur-button {
-             filter: blur(1px);
+         /* CLS TEXT STYLES */
+         .cls-outline-text-heading h1,
+         .cls-outline-text-heading h2,
+         .cls-outline-text-heading h3,
+         .cls-outline-text-heading h4 {
+            -webkit-text-stroke-width: 1px;
+            -webkit-text-stroke-color: hsla(var(--safeLightAccent-hsl), 1);
          }
+         .cls-outline-only-text-heading h1,
+         .cls-outline-only-text-heading h2,
+         .cls-outline-only-text-heading h3,
+         .cls-outline-only-text-heading h4 {
+            text-fill-color: transparent!important;
+            -webkit-text-fill-color: transparent!important;
+            -webkit-text-stroke-width: 1px;
+            -webkit-text-stroke-color: hsla(var(--safeLightAccent-hsl), 1);
+            background-clip: text !important;
+            -webkit-background-clip: text !important;
+            text-fill-color: transparent !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-box-decoration-break: clone !important;
+            font-weight: inherit !important;
+         }
+         .cls-background-on-bold-heading h1 strong,
+         .cls-background-on-bold-heading h2 strong,
+         .cls-background-on-bold-heading h3 strong,
+         .cls-background-on-bold-heading h4 strong {
+            text-fill-color: hsla(var(--white-hsl), 1);
+            -webkit-text-fill-color: hsla(var(--white-hsl), 1);
+            background: hsla(var(--safeLightAccent-hsl), 1);
+         }
+         .cls-rounded-background-on-bold-heading h1 strong,
+         .cls-rounded-background-on-bold-heading h2 strong,
+         .cls-rounded-background-on-bold-heading h3 strong,
+         .cls-rounded-background-on-bold-heading h4 strong {
+            text-fill-color: hsla(var(--white-hsl), 1);
+            -webkit-text-fill-color: hsla(var(--white-hsl), 1);
+            background: hsla(var(--safeLightAccent-hsl), 1);
+            border-radius: 4px;
+         }
+         .cls-highlight-on-bold-heading h1 strong,
+         .cls-highlight-on-bold-heading h2 strong,
+         .cls-highlight-on-bold-heading h3 strong,
+         .cls-highlight-on-bold-heading h4 strong {
+            text-fill-color: hsla(var(--white-hsl), 1);
+            -webkit-text-fill-color: hsla(var(--white-hsl), 1);
+            background: hsla(var(--safeLightAccent-hsl), .6);
+         }
+         .cls-rounded-highlight-on-bold-heading h1 strong,
+         .cls-rounded-highlight-on-bold-heading h2 strong,
+         .cls-rounded-highlight-on-bold-heading h3 strong,
+         .cls-rounded-highlight-on-bold-heading h4 strong {
+            text-fill-color: hsla(var(--white-hsl), 1);
+            -webkit-text-fill-color: hsla(var(--white-hsl), 1);
+            background: hsla(var(--safeLightAccent-hsl), .6);
+            border-radius: 4px;
+         }
+         .cls-background-on-italic-heading h1 em,
+         .cls-background-on-italic-heading h2 em,
+         .cls-background-on-italic-heading h3 em,
+         .cls-background-on-italic-heading h4 em {
+            text-fill-color: hsla(var(--white-hsl), 1);
+            -webkit-text-fill-color: hsla(var(--white-hsl), 1);
+            background: hsla(var(--safeLightAccent-hsl), 1);
+         }
+         .cls-rounded-background-on-italic-heading h1 em,
+         .cls-rounded-background-on-italic-heading h2 em,
+         .cls-rounded-background-on-italic-heading h3 em,
+         .cls-rounded-background-on-italic-heading h4 em {
+            text-fill-color: hsla(var(--white-hsl), 1);
+            -webkit-text-fill-color: hsla(var(--white-hsl), 1);
+            background: hsla(var(--safeLightAccent-hsl), 1);
+            border-radius: 4px;
+         }
+         .cls-highlight-on-italic-heading h1 em,
+         .cls-highlight-on-italic-heading h2 em,
+         .cls-highlight-on-italic-heading h3 em,
+         .cls-highlight-on-italic-heading h4 em {
+            text-fill-color: hsla(var(--white-hsl), 1);
+            -webkit-text-fill-color: hsla(var(--white-hsl), 1);
+            background: hsla(var(--safeLightAccent-hsl), .6);
+         }
+         .cls-rounded-highlight-on-italic-heading h1 em,
+         .cls-rounded-highlight-on-italic-heading h2 em,
+         .cls-rounded-highlight-on-italic-heading h3 em,
+         .cls-rounded-highlight-on-italic-heading h4 em {
+            text-fill-color: hsla(var(--white-hsl), 1);
+            -webkit-text-fill-color: hsla(var(--white-hsl), 1);
+            background: hsla(var(--safeLightAccent-hsl), .6);
+            border-radius: 4px;
+         }
+         .cls-background-on-link-heading-hover h1 a,
+         .cls-background-on-link-heading-hover h2 a,
+         .cls-background-on-link-heading-hover h3 a,
+         .cls-background-on-link-heading-hover h4 a {
+            text-fill-color: hsla(var(--safeLightAccent-hsl), 1)!important;
+            -webkit-text-fill-color: hsla(var(--safeLightAccent-hsl), 1)!important;
+            background-image: linear-gradient(hsla(var(--safeLightAccent-hsl), 1), hsla(var(--safeLightAccent-hsl), 1))!important;
+            background-size: 100% 2px!important;
+            background-position: 0 bottom!important;
+            transition: background-size .3s ease-in-out, text-fill-color .3s ease-in-out, -webkit-text-fill-color .3s ease-in-out;
+         }
+         .cls-background-on-link-heading-hover h1 a:hover,
+         .cls-background-on-link-heading-hover h2 a:hover,
+         .cls-background-on-link-heading-hover h3 a:hover,
+         .cls-background-on-link-heading-hover h4 a:hover {
+            text-fill-color: hsla(var(--white-hsl), 1)!important;
+            -webkit-text-fill-color: hsla(var(--white-hsl), 1)!important;
+            background-size: 100% 100%!important;
+         }
+         .cls-highlight-on-link-heading-hover h1 a,
+         .cls-highlight-on-link-heading-hover h2 a,
+         .cls-highlight-on-link-heading-hover h3 a,
+         .cls-highlight-on-link-heading-hover h4 a {
+            text-fill-color: hsla(var(--white-hsl), 1)!important;
+            -webkit-text-fill-color: hsla(var(--white-hsl), 1)!important;
+            background-image: linear-gradient(hsla(var(--safeLightAccent-hsl), .6), hsla(var(--safeLightAccent-hsl), .6))!important;
+            background-size: 100% 2px!important;
+            background-position: 0 bottom!important;
+            transition: background-size .3s ease-in-out, text-fill-color .3s ease-in-out, -webkit-text-fill-color .3s ease-in-out;
+         }
+         .cls-highlight-on-link-heading-hover h1 a:hover,
+         .cls-highlight-on-link-heading-hover h2 a:hover,
+         .cls-highlight-on-link-heading-hover h3 a:hover,
+         .cls-highlight-on-link-heading-hover h4 a:hover {
+            background-size: 100% 100%!important;
+         }
+         .cls-slide-out-underline-on-link-heading-hover h1 a,
+         .cls-slide-out-underline-on-link-heading-hover h2 a,
+         .cls-slide-out-underline-on-link-heading-hover h3 a,
+         .cls-slide-out-underline-on-link-heading-hover h4 a {
+            text-fill-color: hsla(var(--safeLightAccent-hsl), 1)!important;
+            -webkit-text-fill-color: hsla(var(--safeLightAccent-hsl), 1)!important;
+            background-image: linear-gradient(hsla(var(--safeLightAccent-hsl), 1), hsla(var(--safeLightAccent-hsl), 1))!important;
+            background-size: 0% 2px!important;
+            background-position: 0 bottom!important;
+            transition: background-size .2s ease-in-out, text-fill-color .3s ease-in-out, -webkit-text-fill-color .3s ease-in-out;
+         }
+         .cls-slide-out-underline-on-link-heading-hover h1 a:hover,
+         .cls-slide-out-underline-on-link-heading-hover h2 a:hover,
+         .cls-slide-out-underline-on-link-heading-hover h3 a:hover,
+         .cls-slide-out-underline-on-link-heading-hover h4 a:hover {
+            background-size: 100% 2px!important;
+         }
+         .cls-background-on-text-heading h1,
+         .cls-background-on-text-heading h2,
+         .cls-background-on-text-heading h3,
+         .cls-background-on-text-heading h4 {
+            text-fill-color: hsla(var(--white-hsl), 1);
+            -webkit-text-fill-color: hsla(var(--white-hsl), 1);
+            background: hsla(var(--safeLightAccent-hsl), 1);
+         }
+         .cls-underline-heading-hover h1 strong,
+         .cls-underline-heading-hover h2 strong,
+         .cls-underline-heading-hover h3 strong,
+         .cls-underline-heading-hover h4 strong {
+            display: inline-flex;
+            overflow: hidden;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-content: flex-start;
+            align-items: end;
+            justify-items: start;
+            justify-content: flex-start;
+            position: relative;
+         }
+         .cls-underline-heading-hover h1 strong:before,
+         .cls-underline-heading-hover h2 strong:before,
+         .cls-underline-heading-hover h3 strong:before,
+         .cls-underline-heading-hover h4 strong:before {
+            background: hsla(var(--safeLightAccent-hsl), 1);
+            content: "";
+            height: 4px;
+            position: absolute;
+            width: 100%;
+            display: inline-flex;
+            bottom: 4px;
+            left: -100%;
+            overflow: hidden;
+            transition: left .5s ease-in-out;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            align-content: center;
+            align-items: center;
+            justify-content: center;
+         }
+         .cls-underline-heading-hover h1:hover strong:before,
+         .cls-underline-heading-hover h2:hover strong:before,
+         .cls-underline-heading-hover h3:hover strong:before,
+         .cls-underline-heading-hover h4:hover strong:before {
+            left: 0;
+         }
+         /* CLS TEXT ANIMATION */
+         .cls-gradient-infinite-heading h1,
+         .cls-gradient-infinite-heading h2,
+         .cls-gradient-infinite-heading h3,
+         .cls-gradient-infinite-heading h4 {
+            animation: animate-gradient-background 7s infinite cubic-bezier(0.46, 0.03, 0.52, 0.96);
+            background-size: 400% 400%!important;
+            background-image: linear-gradient(-45deg, hsl(var(--lightAccent-hsl)), hsl(var(--accent-hsl)), hsl(var(--darkAccent-hsl)));
+            background-clip: text !important;
+            -webkit-background-clip: text !important;
+            text-fill-color: transparent !important;
+            -webkit-text-fill-color: transparent !important;
+            -webkit-box-decoration-break: clone !important;
+         }
+
+         /* CLS BUTTON STYLES */
          .cls-hue-rotate {
-             filter: hue-rotate(90deg);
+            filter: hue-rotate(90deg);
          }
-         .cls-hue-rotate.cls-blur-button {
-             filter: blur(1px) hue-rotate(90deg);
+         .cls-box-shadow-button {
+            box-shadow: 0px 0px 10px 0px hsla(var(--safeLightAccent-hsl), 1);
+            transition: box-shadow .2s cubic-bezier(0.46, 0.03, 0.52, 0.96), transform .2s ease-in-out;
          }
-         /* CLS ANIMATIONS */
+         .cls-box-shadow-button:hover {
+            box-shadow: -1px 4px 10px 0px hsla(var(--safeLightAccent-hsl), 1);
+            transform: translateY(-4px);
+         }
+         .cls-3d-button {
+            box-shadow: 0 5px 0 0 hsla(var(--safeLightAccent-hsl), .7);
+            transition: box-shadow .2s cubic-bezier(0.46, 0.03, 0.52, 0.96), transform .2s ease-in-out;
+         }
+         .cls-3d-button:hover {
+            box-shadow: 0 10px 0 0 hsla(var(--safeLightAccent-hsl), .7);
+            transform: translateY(-5px);
+         }
+         .cls-box-shadow-button.cls-3d-button {
+            box-shadow: -1px 4px 10px 0px hsla(var(--safeLightAccent-hsl), 1), 0 5px 0 0 hsla(var(--safeLightAccent-hsl), .7);
+         }
+         .cls-box-shadow-button:hover.cls-3d-button:hover {
+            box-shadow: -1px 4px 10px 0px hsla(var(--safeLightAccent-hsl), 1), 0 10px 0 0 hsla(var(--safeLightAccent-hsl), .7);
+            transform: translateY(-5px);
+         }
+         .cls-3d-button:active,
+         .cls-box-shadow-button.cls-3d-button:active {
+            box-shadow: 0 3px 0 0 hsla(var(--safeLightAccent-hsl), .7);
+            transform: translateY(2px);
+         }
+         .cls-arrow-button a::after {
+            font-family: 'Material Icons';
+            content: "arrow_forward";
+            font-size: 24px;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            font-weight: normal;
+            font-style: normal;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+            -moz-osx-font-smoothing: grayscale;
+            font-feature-settings: 'liga';
+            direction: ltr;
+            margin: 0 0 0 10px;
+         }
+         .cls-thumb-up-button a::after {
+            font-family: 'Material Icons';
+            content: "thumb_up";
+            font-size: 24px;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            font-weight: normal;
+            font-style: normal;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+            -moz-osx-font-smoothing: grayscale;
+            font-feature-settings: 'liga';
+            direction: ltr;
+            margin: 0 0 0 10px;
+         }
+         /* CLS BUTTON ANIMATIONS */
+         .cls-pulse-button-infinite {
+            animation: animate-pulse 1.3s infinite ease-in-out;
+         }
+         .cls-hovering-button-infinite {
+            animation: animate-hovering 2s infinite ease-in-out
+         }
          .cls-shake-button-on-hover:hover {
-             animation: animate-shake-button 1s ease-in-out;
+            animation: animate-shake 1s ease-in-out;
          }
-         .cls-pulse-button-infinite:has([class*="sqs-button-element--secondary"]) {
-            animation: animate-pulse-accent 1.3s infinite ease-in-out;
+         .cls-gradient-button-infinite {
+            animation: animate-gradient-background 7s infinite cubic-bezier(0.46, 0.03, 0.52, 0.96);
+            background-size: 400% 400%!important;
+            background-image: linear-gradient(-45deg, hsl(var(--lightAccent-hsl)), hsl(var(--accent-hsl)), hsl(var(--darkAccent-hsl)));
          }
-         .cls-pulse-button-infinite:has([class*="sqs-button-element--secondary"]).cls-shake-button-on-hover:hover {
-            animation: animate-pulse-accent 1.3s infinite ease-in-out, animate-shake-button 1s ease-in-out;
+         .cls-gradient-button-infinite a {
+            background: transparent!important;
+            color: hsl(var(--black-hsl))!important;
          }
-         @keyframes animate-shake-button {
-             10% { transform: translate3d(-1px, 0, 0); offset: 0.1; }
-             20% { transform: translate3d(2px, 0, 0); offset: 0.2; }
-             30% { transform: translate3d(-3px, 0, 0); offset: 0.3; }
-             40% { transform: translate3d(3px, 0, 0); offset: 0.4; }
-             50% { transform: translate3d(-3px, 0, 0); offset: 0.5; }
-             60% { transform: translate3d(3px, 0, 0); offset: 0.6; }
-             70% { transform: translate3d(-3px, 0, 0); offset: 0.7; }
-             80% { transform: translate3d(2px, 0, 0); offset: 0.8; }
-             90% { transform: translate3d(-1px, 0, 0); offset: 0.9; }
+         .cls-pulse-button-infinite.cls-hovering-button-infinite {
+            animation: animate-pulse 1.3s infinite ease-in-out, 
+                       animate-hovering 2s infinite ease-in-out;
          }
-         @keyframes animate-pulse-accent {
-            0% {
-                transform: scale(0.98);
-                box-shadow: 0 0 0 0 hsla(var(--safeLightAccent-hsl), 0.8);
-            }
-        
-            70% {
-                transform: scale(1);
-                box-shadow: 0 0 0 10px hsla(var(--safeLightAccent-hsl), 0);
-            }
-        
-            100% {
-                transform: scale(0.98);
-                box-shadow: 0 0 0 0 hsla(var(--safeLightAccent-hsl), 0);
-            }
+         .cls-pulse-button-infinite.cls-shake-button-on-hover:hover {
+            animation: animate-pulse 1.3s infinite ease-in-out, 
+                       animate-shake 1s ease-in-out;
+         }
+         .cls-puls-button-infinite.cls-gradient-button-infinite {
+            animation: animate-pulse 1.3s infinite ease-in-out, 
+                       animate-gradient-background 7s infinite cubic-bezier(0.46, 0.03, 0.52, 0.96);
+         }
+         .cls-hovering-button-infinite.cls-shake-button-on-hover:hover {
+            animation: animate-hovering 2s infinite ease-in-out, 
+                       animate-shake 1s ease-in-out;
+         }
+         .cls-hovering-button-infinite.cls-gradient-button-infinite {
+            animation: animate-hovering 2s infinite ease-in-out, 
+                       animate-gradient-background 7s infinite cubic-bezier(0.46, 0.03, 0.52, 0.96);
+         }
+         .cls-shake-button-on-hover:hover.cls-gradient-button-infinite {
+            animation: animate-hovering 2s infinite ease-in-out,
+                       animate-gradient-background 7s infinite cubic-bezier(0.46, 0.03, 0.52, 0.96);
+         }
+         .cls-pulse-button-infinite.cls-hovering-button-infinite.cls-shake-button-on-hover:hover {
+            animation: animate-pulse 1.3s infinite ease-in-out, 
+                       animate-hovering 2s infinite ease-in-out, 
+                       animate-shake 1s ease-in-out;
+         }
+         .cls-pulse-button-infinite.cls-shake-button-on-hover:hover.cls-gradient-button-infinite {
+            animation: animate-pulse 1.3s infinite ease-in-out,
+                       animate-hovering 2s infinite ease-in-out,
+                       animate-gradient-background 7s infinite cubic-bezier(0.46, 0.03, 0.52, 0.96);
+         }
+         .cls-hovering-button-infinite.cls-shake-button-on-hover:hover.cls-gradient-button-infinite {
+            animation: animate-hovering 2s infinite ease-in-out,
+                       animate-shake 1s ease-in-out,
+                       animate-gradient-background 7s infinite cubic-bezier(0.46, 0.03, 0.52, 0.96);
+         }
+         .cls-pulse-button-infinite.cls-hovering-button-infinite.cls-shake-button-on-hover:hover.cls-gradient-button-infinite {
+            animation: animate-pulse 1.3s infinite ease-in-out,
+                       animate-shake 1s ease-in-out,
+                       animate-hovering 2s infinite ease-in-out,
+                       animate-gradient-background 7s infinite cubic-bezier(0.46, 0.03, 0.52, 0.96);
+         }
+         @keyframes animate-shake {
+            10% { transform: translate3d(-1px, 0, 0); offset: 0.1; }
+            20% { transform: translate3d(2px, 0, 0); offset: 0.2; }
+            30% { transform: translate3d(-3px, 0, 0); offset: 0.3; }
+            40% { transform: translate3d(3px, 0, 0); offset: 0.4; }
+            50% { transform: translate3d(-3px, 0, 0); offset: 0.5; }
+            60% { transform: translate3d(3px, 0, 0); offset: 0.6; }
+            70% { transform: translate3d(-3px, 0, 0); offset: 0.7; }
+            80% { transform: translate3d(2px, 0, 0); offset: 0.8; }
+            90% { transform: translate3d(-1px, 0, 0); offset: 0.9; }
+         }
+         @keyframes animate-hovering {
+            0% { transform: translate3d(0, 0, 0); }
+            25% { transform: translate3d(0, 3px, 0); }
+            50% { transform: translate3d(0, -3px, 0); }
+            75% { transform: translate3d(0, 3px, 0); }
+            100% { transform: translate3d(0, 0, 0); }
+         }
+         @keyframes animate-gradient-background {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+         }
+         @keyframes animate-pulse {
+            0% {transform: scale(0.98); box-shadow: 0 0 0 0 hsla(var(--safeLightAccent-hsl), 0.8); }
+            70% {transform: scale(1); box-shadow: 0 0 0 10px hsla(var(--safeLightAccent-hsl), 0); }
+            100% { transform: scale(0.98); box-shadow: 0 0 0 0 hsla(var(--safeLightAccent-hsl), 0); }
          }`;
         document.head.appendChild(localStyleTag);
+    }
+    if(!localMaterialHead) {
+        const localMaterialStyleTag = document.createElement('link');
+        localMaterialStyleTag.setAttribute('cls-material-local-style', 'true');
+        localMaterialStyleTag.setAttribute('href', 'https://fonts.googleapis.com/icon?family=Material+Icons');
+        localMaterialStyleTag.setAttribute('rel', 'stylesheet');
+        document.head.appendChild(localMaterialStyleTag);
     }
 }
 
@@ -365,6 +723,7 @@ const CLS_InitApplication = function () {
         CLS_CheckItemsHaveBeenRendered();
     }
     else {
+        CLS_CheckItemsHaveBeenRendered();
         console.error("the website is not editable");
     }
 }
@@ -373,7 +732,6 @@ const CLS_AddParentWindowClickEvent = function () {
     window.parent.document.addEventListener('click', function (event) {
         if (event.target.attributes && event.target.attributes['data-test']) {
             if (event.target.dataset.test == 'frameToolbarEdit') {
-                console.log("this is the done button");
                 // TODO: can we make this better? This is pretty sloppy to me
                 setTimeout(() => {
                     CLS_CheckItemsHaveBeenRendered();
@@ -391,14 +749,26 @@ const CLS_AddIframeClickEvent = function () {
             if (event.target.className && 
                 event.target.className.startsWith(cls_EditorConfig.AddBlockModalClass) &&
                 event.target.innerText.toLowerCase() == cls_ButtonTypeInfo.Type.toLowerCase()) {
-                cls_CurrentEditType = "button";
+                cls_CurrentEditType = cls_ButtonTypeInfo.Type;
+                console.log("they have added a button: ", event);
+                observer.observe(event.target.ownerDocument, { childList: true, subtree: true })
+            }
+            else if (event.target.className && 
+                event.target.className.startsWith(cls_EditorConfig.AddBlockModalClass) &&
+                event.target.innerText.toLowerCase() == cls_TextTypeInfo.Type.toLowerCase()) {
+                cls_CurrentEditType = cls_TextTypeInfo.Type;
                 console.log("they have added a button: ", event);
                 observer.observe(event.target.ownerDocument, { childList: true, subtree: true })
             }
             // they clicked on a button that they are currently going to edit.
             if (event.target.classList && event.target.classList.contains(cls_ButtonTypeInfo.SelectorClass)) {
                 cls_currentId = event.target.id;
-                cls_CurrentEditType = "button";
+                cls_CurrentEditType = cls_ButtonTypeInfo.Type;
+                observer.observe(window.parent.document, { childList: true, subtree: true });
+            }
+            else if (event.target.classList && event.target.classList.contains(cls_TextTypeInfo.SelectorClass)) {
+                cls_currentId = event.target.id;
+                cls_CurrentEditType = cls_TextTypeInfo.Type;
                 observer.observe(window.parent.document, { childList: true, subtree: true });
             }
         }
@@ -494,11 +864,6 @@ const CLS_CheckItemsHaveBeenRendered = function () {
             if (element && element.classList) {
                 element.classList.toggle(item.ElementClass, true);
             }
-            // else {
-            //     // TODO: remove items that don't exist. This wont work actually because
-            //     //       these may exist on another page
-            //     console.log("This element doesn't exist", item);
-            // }
         }
     }
 }
@@ -564,16 +929,51 @@ const cls_EditorConfig = {
             AddonFunctions: [
                 {
                     FunctionGroupLabel: "Styles",
-                    FunctionLabel: "Blur Button",
+                    FunctionLabel: "Rotate Hue Of Button",
                     FunctionName: "ToggleClassWithToggleElement",
-                    FunctionClass: "cls-blur-button",
+                    FunctionClass: "cls-hue-rotate",
                     FunctionViewType: "toggle",
                 },
                 {
                     FunctionGroupLabel: "Styles",
-                    FunctionLabel: "Rotate Hue Of Button",
+                    FunctionLabel: "Shadow Button",
                     FunctionName: "ToggleClassWithToggleElement",
-                    FunctionClass: "cls-hue-rotate",
+                    FunctionClass: "cls-box-shadow-button",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Styles",
+                    FunctionLabel: "3d Button",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-3d-button",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Styles",
+                    FunctionLabel: "Arrow Button",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-arrow-button",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Styles",
+                    FunctionLabel: "Thumbs Up Button",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-thumb-up-button",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Animations",
+                    FunctionLabel: "Gradient Button",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-gradient-button-infinite",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Animations",
+                    FunctionLabel: "Hovering Button",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-hovering-button-infinite",
                     FunctionViewType: "toggle",
                 },
                 {
@@ -590,6 +990,148 @@ const cls_EditorConfig = {
                     FunctionClass: "cls-pulse-button-infinite",
                     FunctionViewType: "toggle",
                 }
+            ]
+        },
+        {
+            /**
+             * The type that should be named the same as what is available in the "Add Block" window
+             */
+            Type: "text",
+            /**
+             * The class that we are targeting to add and remove our classes to.
+             */
+            SelectorClass: "sqs-block-html",
+            /**
+             * The query selector string used to get the modal editor tab list for this addon type
+             */
+            ModalEditorTabListQuerySelector: `div[role="tablist"]`,
+            /**
+             * The query selector string used to get the modal editor body for this addon type
+             */
+            ModalEditorBodyQuerySelector: `div[data-test="html-block-editor-form"]`,
+
+            /**
+             * @type {Array<{
+             *               FunctionGroupLabel: string,
+             *               FunctionLabel: string,
+             *               FunctionName: "ToggleClassWithToggleElement",
+             *               FunctionClass: "cls-blur-button" | "cls-hue-rotate" | "cls-shake-button-on-hover",
+             *               FunctionViewType: "toggle"
+             *             }>}
+             */
+            AddonFunctions: [
+                {
+                    FunctionGroupLabel: "Heading Style",
+                    FunctionLabel: "Outline Text",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-outline-text-heading",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Style",
+                    FunctionLabel: "Outline Only Text",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-outline-only-text-heading",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Style",
+                    FunctionLabel: "Background On Text",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-background-on-text-heading",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Bold Style",
+                    FunctionLabel: "Background On Bold Text",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-background-on-bold-heading",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Bold Style",
+                    FunctionLabel: "Rounded Background On Bold Text",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-rounded-background-on-bold-heading",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Bold Style",
+                    FunctionLabel: "Highlight On Bold Text",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-highlight-on-bold-heading",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Bold Style",
+                    FunctionLabel: "Rounded Highlight Background On Bold Text",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-rounded-highlight-on-bold-heading",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Italic Style",
+                    FunctionLabel: "Background On Italic Text",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-background-on-italic-heading",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Italic Style",
+                    FunctionLabel: "Rounded Background On Italic Text",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-rounded-background-on-italic-heading",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Italic Style",
+                    FunctionLabel: "Highlight On Italic Text",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-highlight-on-italic-heading",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Italic Style",
+                    FunctionLabel: "Rounded Highlight Background On Italic Text",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-rounded-highlight-on-italic-heading",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Link Hover Style",
+                    FunctionLabel: "Background On Link Hover",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-background-on-link-heading-hover",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Link Hover Style",
+                    FunctionLabel: "Highlight Background On Link Hover",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-highlight-on-link-heading-hover",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Link Hover Style",
+                    FunctionLabel: "Slide Out Underline On Link Hover",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-slide-out-underline-on-link-heading-hover",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Animation",
+                    FunctionLabel: "Gradient Text",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-gradient-infinite-heading",
+                    FunctionViewType: "toggle",
+                },
+                {
+                    FunctionGroupLabel: "Heading Bold Hover Animation",
+                    FunctionLabel: "Underline On Bold Text Hover",
+                    FunctionName: "ToggleClassWithToggleElement",
+                    FunctionClass: "cls-underline-heading-hover",
+                    FunctionViewType: "toggle",
+                },
             ]
         }
     ]
@@ -608,6 +1150,11 @@ let deletingNode = false;
  * The info from the configuration for the button selection.
  */
 const cls_ButtonTypeInfo = cls_EditorConfig.AddonTypes.find(x => x.Type.toLowerCase() == "button");
+
+/**
+ * The info from the configuration for the button selection.
+ */
+ const cls_TextTypeInfo = cls_EditorConfig.AddonTypes.find(x => x.Type.toLowerCase() == "text");
 
 const observer = new MutationObserver(([mutation]) => {
 
@@ -724,7 +1271,14 @@ const CLS_HandleNodeTypeLookup = function(value) {
         // If it is of type button 
         if(value.classList.contains(cls_ButtonTypeInfo.SelectorClass)) {
             cls_currentId = value.id;
-            cls_CurrentEditType = 'button';
+            cls_CurrentEditType = cls_ButtonTypeInfo.Type;
+            return true;
+            // here we are just making sure 
+            //observer.observe(window.parent.document, { childList: true, subtree: true });
+        }
+        else if(value.classList.contains(cls_TextTypeInfo.SelectorClass)) {
+            cls_currentId = value.id;
+            cls_CurrentEditType = cls_TextTypeInfo.Type;
             return true;
             // here we are just making sure 
             //observer.observe(window.parent.document, { childList: true, subtree: true });
@@ -752,6 +1306,43 @@ const CLS_Functions = {
         const element = document.getElementById(selectedId);
         element.classList.toggle(functionClass, event.currentTarget.checked);
         toggleLabelElement.classList.toggle('cls-sp-toggle-checked', event.currentTarget.checked);
+        /**
+         * @type {Array<{ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean}>}
+         */
+        let currentItems = JSON.parse(localStorage.getItem(cls_itemsToSaveCacheKey));
+        if (currentItems) {
+            const foundEntry = currentItems.findIndex(x => x.ElementId == selectedId && x.ElementClass == functionClass && x.ElementType == elementType);
+            if (foundEntry != -1) {
+                currentItems.splice(foundEntry, 1);
+            }
+        }
+        else {
+            currentItems = [];
+        }
+        currentItems.push({ ElementId: selectedId, ElementClass: functionClass, ElementType: elementType, IsChecked: event.currentTarget.checked});
+        CLS_SetItems(cls_itemsToSaveCacheKey, JSON.stringify(currentItems));
+    },
+
+    /**
+     * Global class to toggle and handle updates to toggle classes by ids that exist in CSS
+     *
+     * @param {string} selectedId 
+     * @param {string} functionClass 
+     * @param {string} elementType 
+     * @param {HTMLInputElement} toggleLabelElement 
+     * @param {Event} event 
+     */
+    ToggleClassWithToggleElementAndColorSelection: function (selectedId, functionClass, elementType, toggleLabelElement, event) {
+
+        const element = document.getElementById(selectedId);
+        toggleLabelElement.classList.toggle('cls-sp-toggle-checked', event.currentTarget.checked);
+        
+        if(event.currentTarget.checked) {
+            // TODO: create color selection items here.
+        }
+        else {
+            // TODO: remove color selection items here.
+        }
         /**
          * @type {Array<{ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean}>}
          */
@@ -823,8 +1414,8 @@ const CLS_GetSaveButton = function () {
         cls_SaveToDbButton = window.parent.document.createElement('div');
         cls_SaveToDbButton.classList.add(['cls-save-button-container']);
 
-        const saveButtonBackground = window.parent.document.createElement('div');
-        saveButtonBackground.classList.add(['cls-save-button-background']);
+        // const saveButtonBackground = window.parent.document.createElement('div');
+        // saveButtonBackground.classList.add(['cls-save-button-background']);
 
         const saveButton = window.parent.document.createElement('button');
         saveButton.classList.add(['cls-save-button']);
@@ -849,10 +1440,11 @@ const CLS_GetSaveButton = function () {
             itemsInDb = itemsInDb.filter(x => !request.RemoveList.some(y => x.ElementId == y.ElementId && x.ElementType == y.ElementType && x.ElementClass == y.ElementClass));
             localStorage.setItem(cls_currentSavedItemsCacheKey, JSON.stringify(itemsInDb));
             localStorage.setItem(cls_itemsToSaveCacheKey, "[]");
+            CLS_HandleSaveButtonAddRemove();
             console.log("Here is the new saved list", itemsInDb);
         }
         cls_SaveToDbButton.appendChild(saveButton);
-        cls_SaveToDbButton.appendChild(saveButtonBackground);
+        // cls_SaveToDbButton.appendChild(saveButtonBackground);
     }
     return cls_SaveToDbButton;
 
@@ -923,9 +1515,13 @@ const CLS_HandleEditorLookup = function (value) {
             const editorModal = elementList[0];
             let tabList;
             let tabBody;
-            if (cls_CurrentEditType == 'button') {
+            if (cls_CurrentEditType == cls_ButtonTypeInfo.Type) {
                 tabList = editorModal.querySelector(cls_ButtonTypeInfo.ModalEditorTabListQuerySelector);
                 tabBody = editorModal.querySelector(cls_ButtonTypeInfo.ModalEditorBodyQuerySelector);
+            }
+            if (cls_CurrentEditType == cls_TextTypeInfo.Type) {
+                tabList = editorModal.querySelector(cls_TextTypeInfo.ModalEditorTabListQuerySelector);
+                tabBody = editorModal.querySelector(cls_TextTypeInfo.ModalEditorBodyQuerySelector);
             }
             if (tabList && tabBody) {
                 if (tabList.children.length > 0) {
@@ -949,14 +1545,26 @@ const CLS_CreateNewEditorTab = function (tabList, tabBody) {
         return;
     }
     const newBody = window.parent.document.createElement("div");
-    newBody.classList.add(['cl-item-list']);
+    newBody.classList.add(['cls-item-list']);
     newBody.style = "display: none;";
 
-    if (cls_CurrentEditType == 'button') {
+    if (cls_CurrentEditType == cls_ButtonTypeInfo.Type) {
         const distinctLabels = [...new Set(cls_ButtonTypeInfo.AddonFunctions.map(functionList => functionList.FunctionGroupLabel).sort())];
         for (let distinctLabel of distinctLabels) {
             newBody.appendChild(CLS_CreateLabel(distinctLabel));
             let viewFunctionList = cls_ButtonTypeInfo.AddonFunctions.filter(functionInfo => functionInfo.FunctionGroupLabel == distinctLabel).sort();
+            for (let viewFunction of viewFunctionList) {
+                if(viewFunction.FunctionViewType == "toggle") {
+                    newBody.appendChild(CLS_CreateToggle(viewFunction.FunctionLabel, viewFunction.FunctionName, viewFunction.FunctionClass));
+                }
+            }
+        }
+    }
+    if (cls_CurrentEditType == cls_TextTypeInfo.Type) {
+        const distinctLabels = [...new Set(cls_TextTypeInfo.AddonFunctions.map(functionList => functionList.FunctionGroupLabel).sort())];
+        for (let distinctLabel of distinctLabels) {
+            newBody.appendChild(CLS_CreateLabel(distinctLabel));
+            let viewFunctionList = cls_TextTypeInfo.AddonFunctions.filter(functionInfo => functionInfo.FunctionGroupLabel == distinctLabel).sort();
             for (let viewFunction of viewFunctionList) {
                 if(viewFunction.FunctionViewType == "toggle") {
                     newBody.appendChild(CLS_CreateToggle(viewFunction.FunctionLabel, viewFunction.FunctionName, viewFunction.FunctionClass));
@@ -973,7 +1581,7 @@ const CLS_CreateNewEditorTab = function (tabList, tabBody) {
     newTab.firstChild.firstChild.innerHTML = "ColdLabs Editor";
     newTab.firstChild.onclick = ((event) => {
         newTab.firstChild.ariaSelected = "true";
-        newBody.style = "display: block;width: 100%;height: 100%;background: rgb(255, 255, 255);position: absolute;top: 0;left: 0; z-index: 9999;";
+        newBody.style = "display: block;width: 100%;height: 100%;background: rgb(255, 255, 255);position: absolute;top: 0;left: 0;z-index: 9999;overflow: hidden auto;";
 
         let left = 0;
         for (let x = 0; x < tabList.children.length - 2; x++) {
@@ -1087,6 +1695,7 @@ const CLS_CreateToggle = function (toggleName, toggleFunction, toggleClassName) 
 const readyStateCheckInterval = setInterval(function () {
     if (document.readyState === "complete") {
         clearInterval(readyStateCheckInterval);
+        CLS_ValidateLocalStorage();
         CLS_AppendStyles();
         CLS_InitApplication();
     }
