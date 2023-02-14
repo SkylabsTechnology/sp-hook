@@ -1,8 +1,3 @@
-const cls_authTokenKey = "cls_authToken";
-const cls_editorConfigKey = "cls_editorConfig";
-const cls_tokenInfoKey = "cls_tokenInfoKey";
-const cls_apiUrl = "https://api.coldlabs.co";
-
 /**
  * 
  * @param {string} url 
@@ -66,41 +61,12 @@ const CLS_MakeRequest = async (url, method, type, headerList = {}, payload = {})
         }
     });
 };
-
-/**
- * <script id='cls_startup' data-user-token=''  data-website-token='' src='https://localhost:55010/static-files/startup.js' ></script>
- */
-const CLS_Startup = async () => {
-    const cls_startup = document.getElementById('cls_startup');
-    if (cls_startup) {
-        const userToken = cls_startup.dataset.userToken;
-        const websiteToken = cls_startup.dataset.websiteToken;
-        const response = await CLS_MakeRequest(`${cls_apiUrl}/api/config/authenticate-user?userToken=${userToken}&websiteToken=${websiteToken}`, 'GET', 'json', {});
-        if (response.StatusCode == "SUCCESS") {
-            localStorage.setItem("cls_CurrentSavedItems", JSON.stringify(response.Data.ElementAdjustmentList));
-            localStorage.setItem(cls_editorConfigKey, JSON.stringify(response.Data.EditorConfig));
-            sessionStorage.setItem(cls_authTokenKey, response.Data.BearerToken);
-            sessionStorage.setItem(cls_tokenInfoKey, JSON.stringify({ UserToken: userToken, WebsiteToken: websiteToken }));
-            console.log("SUCCESS RESPONSE: ", response);
-            CLS_AddMainScript();
-        }
-        else {
-            console.log("ERROR RESPONSE: ", response);
-        }
-    }
+              
+let request = {
+    orderId: {orderId},
+    orderGrandTotal: {orderGrandTotal},
+    orderGrandTotalCents: {orderGrandTotalCents},
+    customerEmailAddress: {customerEmailAddress}
 }
-
-/**
- * 
- * @param {string} userToken 
- * @param {string} websiteToken 
- */
-const CLS_AddMainScript = async () => {
-    const response = await CLS_MakeRequest(`${cls_apiUrl}/static-files/main.js`, 'GET', 'text');
-    const scriptElement = document.createElement('script');
-    scriptElement.setAttribute('cls-main-script', 'true');
-    scriptElement.innerHTML = response;
-    document.body.appendChild(scriptElement);
-}
-
-CLS_Startup()
+let response = await CLS_MakeRequest("https://api.coldlabs.co/api/user/test-order-submit", "POST", "json", {}, );
+console.log("Response: ", response);

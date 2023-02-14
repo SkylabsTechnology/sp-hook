@@ -71,6 +71,9 @@ const CLS_MakeRequest = async (url, method, type, headerList = {}, payload = {})
  * <script id='cls_startup' data-user-token=''  data-website-token='' src='https://localhost:55010/static-files/startup.js' ></script>
  */
 const CLS_Startup = async () => {
+    /**
+     * @type {HTMLScriptElement}
+     */
     const cls_startup = document.getElementById('cls_startup');
     if (cls_startup) {
         const userToken = cls_startup.dataset.userToken;

@@ -14,10 +14,14 @@ let cls_SaveToDbButton;
   * @type {Element}
   */
 let cls_EditorNavSection;
+/**
+ * @type {boolean}
+ */
+let cls_NavIsExpanded = false;
 
 
 /**
- * Sets items in local storage and handles the save button add and remove based on set items 
+ * 
  * @param {string} key 
  * @param {string} value 
  */
@@ -85,6 +89,7 @@ const CLS_AppendStyles = async function () {
 const CLS_InitApplication = function () {
     if (window.parent.document.body.classList.contains(cls_EditorConfig.BodyEditorClass)) {
         CLS_AddIframeClickEvent();
+        CLS_BuildEditorWindow();
         // CLS_AddParentWindowClickEvent();
         CLS_CheckAddIconToView();
 
@@ -99,10 +104,9 @@ const CLS_InitApplication = function () {
 }
 
 /**
- * Handles adding the click event for the parent Iframe. 
- * 
- * @deprecated I don't think we need this anymore
+ * Adds a click event to the parent window. 
  */
+// I don't think we need this anymore?
 // const CLS_AddParentWindowClickEvent = function () {
 //     window.parent.document.addEventListener('click', function (event) {
 //         if (event.target.attributes && event.target.attributes['data-test']) {
@@ -118,41 +122,57 @@ const CLS_InitApplication = function () {
 // }
 
 /**
- * Adds the internal click even for the internal document
+ * Adds event listener to handle if a button/text/etc.. is clicked on the main document 
+ * this is used to set the non-global tab and set what can be done to it.
  */
 const CLS_AddIframeClickEvent = function () {
     CLS_GetIFrame(true).addEventListener('click', function (event) {
         if (event && event.target) {
-            // they have selected a button from the add block menu
-            if (event.target.className && 
-                event.target.className.startsWith(cls_EditorConfig.AddBlockModalClass) &&
-                event.target.innerText.toLowerCase() == cls_ButtonTypeInfo.Type.toLowerCase()) {
-                cls_CurrentEditType = cls_ButtonTypeInfo.Type;
-                console.log("they have added a button: ", event);
-                observer.observe(event.target.ownerDocument, { childList: true, subtree: true })
-            }
-            else if (event.target.className && 
-                event.target.className.startsWith(cls_EditorConfig.AddBlockModalClass) &&
-                event.target.innerText.toLowerCase() == cls_TextTypeInfo.Type.toLowerCase()) {
-                cls_CurrentEditType = cls_TextTypeInfo.Type;
-                console.log("they have added a button: ", event);
-                observer.observe(event.target.ownerDocument, { childList: true, subtree: true })
-            }
-            // they clicked on a button that they are currently going to edit.
-            if (event.target.classList && event.target.classList.contains(cls_ButtonTypeInfo.SelectorClass)) {
-                cls_currentId = event.target.id;
-                cls_CurrentEditType = cls_ButtonTypeInfo.Type;
-                observer.observe(window.parent.document, { childList: true, subtree: true });
-            }
-            else if (event.target.classList && event.target.classList.contains(cls_TextTypeInfo.SelectorClass)) {
-                cls_currentId = event.target.id;
-                cls_CurrentEditType = cls_TextTypeInfo.Type;
-                observer.observe(window.parent.document, { childList: true, subtree: true });
+            // they clicked on a element that they are currently going to edit.
+            if(event.target.classList) {
+                let foundType = cls_EditorConfig.AddonTypes.find(x => event.target.classList.contains(x.SelectorClass))
+                if(foundType) {
+                    cls_currentId = event.target.id;
+                    cls_CurrentEditType = foundType.Type;
+                    observer.observe(window.parent.document, { childList: true, subtree: true });
+                    if(cls_NavIsExpanded) {
+                        let navDynamicToggle = document.getElementById('dynamic-cls-nav-toggle');
+                        navDynamicToggle.innerText = foundType.Type[0].toUpperCase() + foundType.Type.slice(1).toLowerCase();
+                        // build window info.
+                        CLS_BuildDynamicEditWindow(foundType);
+                    }
+                }
+                
             }
         }
     });
 }
 
+/**
+ * 
+ * @param {{Type: string, SelectorClass: string, ModalEditorTabListQuerySelector: string, ModalEditorBodyQuerySelector: string, AddonFunctions: { FunctionGroupLabel: string, FunctionLabel: string, FunctionName: string, FunctionClass: string, FunctionViewType: string, }[];
+}} foundType 
+ */
+const CLS_BuildDynamicEditWindow = function(foundType) {
+    let navDynamicWindow = document.getElementById('cls-nav-dynamic-window');
+    if(navDynamicWindow) {
+        navDynamicWindow.innerHTML = "";
+        const distinctLabels = [...new Set(foundType.AddonFunctions.map(functionList => functionList.FunctionGroupLabel).sort())];
+        for (let distinctLabel of distinctLabels) {
+            navDynamicWindow.appendChild(CLS_CreateLabel(distinctLabel));
+            let viewFunctionList = foundType.AddonFunctions.filter(functionInfo => functionInfo.FunctionGroupLabel == distinctLabel).sort();
+            for (let viewFunction of viewFunctionList) {
+                if(viewFunction.FunctionViewType == "toggle") {
+                    navDynamicWindow.appendChild(CLS_CreateToggle(viewFunction.FunctionLabel, viewFunction.FunctionName, viewFunction.FunctionClass, viewFunction.IsDisabled, cls_ButtonTypeInfo.Type));
+                }
+            }
+        }
+    }
+};
+
+/**
+ * Checks if the icon exists on the DOM if it does then we set the value to be used globally later. otherwise we create it.
+ */
 const CLS_CheckAddIconToView = async function () {
     if (window.parent.document.getElementsByClassName('cls-icon-container').length == 0) {
         let response = await CLS_MakeRequest(`${cls_apiUrl}/static-files/icon.svg`, 'GET', 'text');
@@ -161,26 +181,190 @@ const CLS_CheckAddIconToView = async function () {
         cls_InsertedIcon.id = "cls-icon-button";
         cls_InsertedIcon.innerHTML = response;
         cls_EditorNavSection = window.parent.document.querySelector("div[data-onboarding-step]");
+        cls_InsertedIcon.onclick = (event) => {
+            if(window.parent.document.querySelector('[data-test="frameToolbarEdit"]')) {
+                // We clicked the icon and nothing should happen because they aren't in edit mode
+                event.preventDefault();
+                return;
+            }
+            CLS_ToggleCLSEditor();
+        };
         cls_EditorNavSection.parentElement.insertBefore(cls_InsertedIcon, cls_EditorNavSection);
     }
     else {
         cls_EditorNavSection = window.parent.document.querySelector("div[data-onboarding-step]");
-        cls_InsertedIcon = cls_EditorNavSection.parentElement.getElementsByClassName('cls-icon-container')[0];
+        cls_InsertedIcon = window.parent.document.getElementById('cls-icon-button');
+        cls_InsertedIcon.onclick = (event) => {
+            if(window.parent.document.querySelector('[data-test="frameToolbarEdit"]')) {
+                // We clicked the icon and nothing should happen because they aren't in edit mode
+                event.preventDefault();
+                return;
+            }
+            CLS_ToggleCLSEditor();
+        };
     }
 }
 
+/**
+ * toggles the editor open/closed and sets global variable to hold state for later.
+ */
+const CLS_ToggleCLSEditor = function() {
+    let navWindow = window.document.getElementById('cls-side-nav');
+    if(navWindow) {
+        let isExpanded = navWindow.classList.contains('expanded');
+        // handle UI change to move over edit window in css.
+        let editorUiMount = window.parent.document.getElementById('page-section-editor-ui-mount');
+        if(editorUiMount) {
+            editorUiMount.classList.toggle('cls-nav-is-expanded', !isExpanded);
+        }
+        let logo = window.parent.document.getElementById('cls-icon');
+        if(logo) {
+            logo.classList.toggle('icon-open', !isExpanded);
+        }
+        cls_NavIsExpanded = !isExpanded;
+        navWindow.classList.toggle('expanded', !isExpanded);
+        document.body.classList.toggle('cls-nav-expanded', !isExpanded);
+
+    }
+    else {
+        CLS_BuildEditorWindow(true);
+    }
+}
+
+/**
+ * Creates the slide out editor window 
+ * @param {boolean} expandOnBuild 
+ */
+const CLS_BuildEditorWindow = function(expandOnBuild = false) {
+    //check if it already exists. If it does then delete it.
+    let navCheck = document.getElementById('cls-side-nav');
+    if(navCheck) {
+        navCheck.parentElement.removeChild(navCheck);
+    }
+    // create main nav
+    const nav = document.createElement('div');
+    nav.classList.add('cls-side-nav');
+    nav.id = "cls-side-nav";
+
+    // create toggle header
+    const navToggleHeader = document.createElement('div');
+    navToggleHeader.classList.add('cls-nav-toggle-header');
+    navToggleHeader.id = 'cls-nav-toggle-header';
+
+    // create global toggle button
+    const navGlobalToggleButton = document.createElement('div');
+    navGlobalToggleButton.classList.add('cls-nav-toggle-button', 'cls-toggle-active');
+    navGlobalToggleButton.id = "global-cls-nav-toggle";
+    navGlobalToggleButton.innerText = "Global";
+    navGlobalToggleButton
+    
+    // create dynamic toggle button
+    const navDynamicToggleButton = document.createElement('div');
+    navDynamicToggleButton.classList.add('cls-nav-toggle-button');
+    navDynamicToggleButton.id = "dynamic-cls-nav-toggle";
+
+    // create global window.
+    const navGlobalWindow = document.createElement('div');
+    navGlobalWindow.classList.add('cls-nav-global-container');
+    navGlobalWindow.id = "cls-nav-global-window";
+
+    // add all labels and functions to the global tab
+    for(let type of cls_EditorConfig.AddonTypes) {
+        navGlobalWindow.appendChild(CLS_CreateLabel(type.Type, true));
+        let distinctLabels = [...new Set(type.AddonFunctions.map(functionList => functionList.FunctionGroupLabel).sort())];
+        for (let distinctLabel of distinctLabels) {
+            navGlobalWindow.appendChild(CLS_CreateLabel(distinctLabel));
+            let viewFunctionList = type.AddonFunctions.filter(functionInfo => functionInfo.FunctionGroupLabel == distinctLabel).sort();
+            for (let viewFunction of viewFunctionList) {
+                if(viewFunction.FunctionViewType == "toggle") {
+                    navGlobalWindow.appendChild(CLS_CreateToggle(viewFunction.FunctionLabel, `Global${viewFunction.FunctionName}`, viewFunction.FunctionClass, viewFunction.IsDisabled, type.Type, true));
+                }
+            }
+        }
+    }
+
+    // creates dynamic window
+    const navDynamicWindow = document.createElement('div');
+    navDynamicWindow.classList.add('cls-nav-global-container', 'cls-hide');
+    navDynamicWindow.id = "cls-nav-dynamic-window";
+
+    // creates hide and show for the dynamic toggle.
+    // hides dynamic window and shows global window
+    navGlobalToggleButton.onclick = () => {
+        navGlobalToggleButton.classList.toggle('cls-toggle-active', true);
+        navDynamicToggleButton.classList.toggle('cls-toggle-active', false);
+        navGlobalWindow.classList.toggle('cls-hide', false);
+        navDynamicWindow.classList.toggle('cls-hide', true);
+    }
+
+    // creates hide and show for the dynamic toggle
+    // hides global window and shows dynamic window
+    navDynamicToggleButton.onclick = () => {
+        if(navDynamicToggleButton.innerText) {
+            let foundType = cls_EditorConfig.AddonTypes.find(x => x.Type.toLowerCase() == navDynamicToggleButton.innerText.toLowerCase());
+            if(foundType) {
+                CLS_BuildDynamicEditWindow(foundType);
+            }
+            navGlobalToggleButton.classList.toggle('cls-toggle-active', false);
+            navDynamicToggleButton.classList.toggle('cls-toggle-active', true);
+            navGlobalWindow.classList.toggle('cls-hide', true);
+            navDynamicWindow.classList.toggle('cls-hide', false);
+        }
+    }
+    
+    document.body.classList.add('cls-contains-nav');
+    
+    if(expandOnBuild) {
+        nav.classList.toggle('expanded', true);
+        document.body.classList.toggle('cls-nav-expanded', true);
+    }
+
+    // add toggle buttons to toggle header
+    navToggleHeader.appendChild(navGlobalToggleButton);
+    navToggleHeader.appendChild(navDynamicToggleButton);
+
+    // add toggle header to nav
+    nav.appendChild(navToggleHeader);
+
+    // add global window to nav
+    nav.appendChild(navGlobalWindow);
+    // add dynamic window to nav
+    nav.appendChild(navDynamicWindow);
+
+    // add nav to document body
+    document.body.appendChild(nav);
+}
+
+/**
+ * Handles checking if the config items have been rendered on the page.
+ */
 const CLS_CheckItemsHaveBeenRendered = function () {
     /**
-     * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean}>}
+     * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean, IsGlobal: boolean}>}
      */
     const items = JSON.parse(localStorage.getItem(cls_currentSavedItemsCacheKey));
     console.log("Found Items: ", items);
     if (items) {
         for (let item of items) {
-            const element = document.getElementById(item.ElementId);
-            if (element && element.classList) {
-                element.classList.toggle(item.ElementClass, true);
+            if(item.IsGlobal) {
+                const foundType = cls_EditorConfig.AddonTypes.find(x => x.Type == item.ElementType);
+                if(foundType) {
+                    const elementList = document.getElementsByClassName(foundType.SelectorClass);
+                    if(elementList) {
+                        for(let element of elementList) {
+                            element.classList.toggle(functionClass, true);
+                            element.classList.toggle(`${functionClass}-global`, true);
+                        }
+                    }
+                }
             }
+            else {
+                const element = document.getElementById(item.ElementId);
+                if (element && element.classList) {
+                    element.classList.toggle(item.ElementClass, true);
+                }
+            }
+            
         }
     }
 }
@@ -240,6 +424,7 @@ const observer = new MutationObserver(([mutation]) => {
             if (value && value.innerHTML && value.innerHTML.includes(cls_EditorConfig.ModalEditorClass)) {
                 CLS_HandleEditorLookup(value);
             }
+            // this handles if a items is deleted and we have a value for it then we go ahead and delete it in the database.
             if(value && value.innerHTML && value.innerHTML.includes('data-test="confirm-btn"') && value.innerHTML.includes('data-test="cancel-btn"') && deletingNode) {
                 CLS_HandleDeleteConfirmation(value);
             }
@@ -248,7 +433,7 @@ const observer = new MutationObserver(([mutation]) => {
 });
 
 /**
- * 
+ * If they are deleting a node then we check here to see if we need to delete settings for the given node.
  * @param {Element} value 
  */
 const CLS_HandleDeleteConfirmation = function(value) {
@@ -259,8 +444,9 @@ const CLS_HandleDeleteConfirmation = function(value) {
     if (confirmButton) {
         console.log("we think this is the confirm button", confirmButton);
         confirmButton.onclick = function () {
+            // TODO: we need to delete the value from the database here.
             /**
-             * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean}>}
+             * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean, IsGlobal: boolean}>}
              */
             let currentSaveItems = JSON.parse(localStorage.getItem(cls_itemsToSaveCacheKey));
             if (currentSaveItems) {
@@ -269,7 +455,7 @@ const CLS_HandleDeleteConfirmation = function(value) {
                 CLS_SetItems(cls_itemsToSaveCacheKey, JSON.stringify(currentSaveItems));
             }
             /**
-             * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean}>}
+             * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean, IsGlobal: boolean}>}
              */
              let currentDbItems = JSON.parse(localStorage.getItem(cls_currentSavedItemsCacheKey));
              if (currentDbItems) {
@@ -370,7 +556,7 @@ const CLS_Functions = {
         element.classList.toggle(functionClass, event.currentTarget.checked);
         toggleLabelElement.classList.toggle('cls-sp-toggle-checked', event.currentTarget.checked);
         /**
-         * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean}>}
+         * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean, IsGlobal: boolean}>}
          */
         let currentItems = JSON.parse(localStorage.getItem(cls_itemsToSaveCacheKey));
         if (currentItems) {
@@ -383,6 +569,41 @@ const CLS_Functions = {
             currentItems = [];
         }
         currentItems.push({ ElementId: selectedId, ElementClass: functionClass, ElementType: elementType, IsChecked: event.currentTarget.checked});
+        CLS_SetItems(cls_itemsToSaveCacheKey, JSON.stringify(currentItems));
+    },
+
+    /**
+     * Global class to toggle and handle updates to toggle GLOBAL classes by ids that exist in CSS
+     *
+     * @param {string} selectedId 
+     * @param {string} functionClass 
+     * @param {string} elementType 
+     * @param {HTMLInputElement} toggleLabelElement 
+     * @param {Event} event 
+     */
+     GlobalToggleClassWithToggleElement: function (selectedId, functionClass, elementType, toggleLabelElement, event) {
+
+        const foundType = cls_EditorConfig.AddonTypes.find(x => x.Type == elementType);
+        const elementList = document.getElementsByClassName(foundType.SelectorClass);
+        for(let element of elementList) {
+            element.classList.toggle(functionClass, event.currentTarget.checked);
+            element.classList.toggle(`${functionClass}-global`, event.currentTarget.checked);
+            toggleLabelElement.classList.toggle('cls-sp-toggle-checked', event.currentTarget.checked);
+        }
+        /**
+         * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean, IsGlobal: boolean}>}
+         */
+        let currentItems = JSON.parse(localStorage.getItem(cls_itemsToSaveCacheKey));
+        if (currentItems) {
+            const foundEntry = currentItems.findIndex(x => x.IsGlobal == true && x.ElementClass == functionClass && x.ElementType == elementType);
+            if (foundEntry != -1) {
+                currentItems.splice(foundEntry, 1);
+            }
+        }
+        else {
+            currentItems = [];
+        }
+        currentItems.push({ ElementId: "", ElementClass: functionClass, ElementType: elementType, IsChecked: event.currentTarget.checked, IsGlobal: true});
         CLS_SetItems(cls_itemsToSaveCacheKey, JSON.stringify(currentItems));
     },
 
@@ -407,7 +628,7 @@ const CLS_Functions = {
             // TODO: remove color selection items here.
         }
         /**
-         * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean}>}
+         * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean, IsGlobal: boolean}>}
          */
         let currentItems = JSON.parse(localStorage.getItem(cls_itemsToSaveCacheKey));
         if (currentItems) {
@@ -440,11 +661,11 @@ const CLS_Functions = {
 const CLS_HandleSaveButtonAddRemove = function () {
     if (cls_InsertedIcon && cls_EditorNavSection) {
         /**
-         * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean}>}
+         * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean, IsGlobal: boolean}>}
          */
          const saveItems = JSON.parse(localStorage.getItem(cls_itemsToSaveCacheKey));
         /**
-         * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean}>}
+         * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean, IsGlobal: boolean}>}
          */
         const dbItems = JSON.parse(localStorage.getItem(cls_currentSavedItemsCacheKey));
         const request = CLS_BuildRequest(saveItems, dbItems);
@@ -475,24 +696,24 @@ const CLS_HandleSaveButtonAddRemove = function () {
 const CLS_GetSaveButton = function () {
     if (!cls_SaveToDbButton) {
         cls_SaveToDbButton = window.parent.document.createElement('div');
-        cls_SaveToDbButton.classList.add(['cls-save-button-container']);
+        cls_SaveToDbButton.classList.add('cls-save-button-container');
 
         // const saveButtonBackground = window.parent.document.createElement('div');
         // saveButtonBackground.classList.add(['cls-save-button-background']);
 
         const saveButton = window.parent.document.createElement('button');
-        saveButton.classList.add(['cls-save-button']);
+        saveButton.classList.add('cls-save-button');
         saveButton.innerText = "Save";
         saveButton.onclick = async function () {
             /**
-             * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean}>}
+             * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean, IsGlobal: boolean}>}
              */
             let editedItems = JSON.parse(localStorage.getItem(cls_itemsToSaveCacheKey));
             if (!editedItems) {
                 editedItems = [];
             }
             /**
-             * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean}>}
+             * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean, IsGlobal: boolean}>}
              */
             let itemsInDb = JSON.parse(localStorage.getItem(cls_currentSavedItemsCacheKey));
             if (!itemsInDb) {
@@ -529,11 +750,11 @@ const CLS_GetSaveButton = function () {
  */
 const CLS_BuildRequest = function(editedItems, itemsInDb) {
     /**
-     * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean}>}
+     * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean, IsGlobal: boolean}>}
      */
      const addList = [];
      /**
-      * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean}>}
+      * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean, IsGlobal: boolean}>}
       */
      const removeList = [];
      for(let value of editedItems) {
@@ -615,7 +836,7 @@ const CLS_CreateNewEditorTab = function (tabList, tabBody) {
         return;
     }
     const newBody = window.parent.document.createElement("div");
-    newBody.classList.add(['cls-item-list']);
+    newBody.classList.add('cls-item-list');
     newBody.style = "display: none;";
 
     if (cls_CurrentEditType == cls_ButtonTypeInfo.Type) {
@@ -625,7 +846,7 @@ const CLS_CreateNewEditorTab = function (tabList, tabBody) {
             let viewFunctionList = cls_ButtonTypeInfo.AddonFunctions.filter(functionInfo => functionInfo.FunctionGroupLabel == distinctLabel).sort();
             for (let viewFunction of viewFunctionList) {
                 if(viewFunction.FunctionViewType == "toggle") {
-                    newBody.appendChild(CLS_CreateToggle(viewFunction.FunctionLabel, viewFunction.FunctionName, viewFunction.FunctionClass, viewFunction.IsDisabled));
+                    newBody.appendChild(CLS_CreateToggle(viewFunction.FunctionLabel, viewFunction.FunctionName, viewFunction.FunctionClass, viewFunction.IsDisabled, cls_ButtonTypeInfo.Type));
                 }
             }
         }
@@ -637,7 +858,7 @@ const CLS_CreateNewEditorTab = function (tabList, tabBody) {
             let viewFunctionList = cls_TextTypeInfo.AddonFunctions.filter(functionInfo => functionInfo.FunctionGroupLabel == distinctLabel).sort();
             for (let viewFunction of viewFunctionList) {
                 if(viewFunction.FunctionViewType == "toggle") {
-                    newBody.appendChild(CLS_CreateToggle(viewFunction.FunctionLabel, viewFunction.FunctionName, viewFunction.FunctionClass, viewFunction.IsDisabled));
+                    newBody.appendChild(CLS_CreateToggle(viewFunction.FunctionLabel, viewFunction.FunctionName, viewFunction.FunctionClass, viewFunction.IsDisabled, cls_TextTypeInfo.Type));
                 }
             }
         }
@@ -684,11 +905,14 @@ const CLS_CreateNewEditorTab = function (tabList, tabBody) {
  * @param {string} labelName 
  * @returns {HTMLDivElement}
  */
-const CLS_CreateLabel = function (labelName) {
+const CLS_CreateLabel = function (labelName, largeLabel = false) {
     const labelWrapper = window.parent.document.createElement("div");
     labelWrapper.setAttribute("data-field", "true");
     const label = window.parent.document.createElement("label");
-    label.classList.add(['cls-sp-toggle-label']);
+    label.classList.add('cls-sp-toggle-label');
+    if(largeLabel) {
+        label.classList.add('cls-sp-toggle-label-large');
+    }
     label.innerHTML = labelName;
     labelWrapper.appendChild(label);
     return labelWrapper;
@@ -700,58 +924,81 @@ const CLS_CreateLabel = function (labelName) {
  * @param {string} toggleName 
  * @returns {HTMLDivElement}
  */
-const CLS_CreateToggle = function (toggleName, toggleFunction, toggleClassName, isDisabled) {
+const CLS_CreateToggle = function (toggleName, toggleFunction, toggleClassName, isDisabled, editType, isGlobal = false) {
+
     const targetIdElement = document.getElementById(cls_currentId);
-    const idIsChecked = targetIdElement.classList.contains(toggleClassName);
+    // TODO: handle if it is a global to go ahead and have it checked. Probably through the element list.
+    let isGloballyChecked = false;
+    let idIsChecked = false; 
+    if(targetIdElement) {
+        isGloballyChecked = targetIdElement.classList.contains(`${toggleClassName}-global`);
+        idIsChecked = targetIdElement.classList.contains(toggleClassName);
+    }
+    if(isGlobal) {
+        /**
+         * @type {Array<{Id: number, ElementId: string, ElementClass: string, ElementType: string, IsChecked: boolean, IsGlobal: boolean}>}
+         */
+        let dbItems = JSON.parse(localStorage.getItem(cls_currentSavedItemsCacheKey));
+        let foundItem = dbItems.find(x => x.ElementClass == toggleClassName && x.IsGlobal == true);
+        if(foundItem) {
+            idIsChecked = true;
+        }
+    }
 
     // |
     const toggleOuterWrapper = window.parent.document.createElement("div");
-    toggleOuterWrapper.classList.add(['cls-sp-toggle-outer-wrapper']);
+    toggleOuterWrapper.classList.add('cls-sp-toggle-outer-wrapper');
     // |-|
     const toggleOuterContainer = window.parent.document.createElement("div");
-    toggleOuterContainer.classList.add(['cls-sp-toggle-outer-container']);
+    toggleOuterContainer.classList.add('cls-sp-toggle-outer-container');
     // |-|-|
     const toggleInnerContainer = window.parent.document.createElement('div');
-    toggleInnerContainer.classList.add(['cls-sp-toggle-inner-container']);
+    toggleInnerContainer.classList.add('cls-sp-toggle-inner-container');
 
     const toggleLockedIcon = window.parent.document.createElement('span');
     if(isDisabled) {
         toggleInnerContainer.setAttribute("disabled",  "");
-        toggleLockedIcon.classList.add(['material-icons']);
+        toggleLockedIcon.classList.add('material-icons');
         toggleLockedIcon.innerHTML = "lock";
         toggleLockedIcon.onclick = () => {
             window.open("https://coldllabs.co");
         }
     }
+    const toggleGlobalIcon = window.parent.document.createElement('span');
+    if(isGloballyChecked) {
+        toggleInnerContainer.setAttribute("disabled",  "");
+        toggleGlobalIcon.classList.add('material-icons');
+        toggleGlobalIcon.innerHTML = "public";
+    }
     // |-|-|-|
     const toggleInnerLabelContainer = window.parent.document.createElement('div');
-    toggleInnerLabelContainer.classList.add(['cls-sp-toggle-inner-label-container']);
+    toggleInnerLabelContainer.classList.add('cls-sp-toggle-inner-label-container');
     // |-|-|-|-|
     const toggleInnerLabel = window.parent.document.createElement('label');
-    toggleInnerLabel.classList.add(['cls-sp-toggle-inner-label']);
+    toggleInnerLabel.classList.add('cls-sp-toggle-inner-label');
     toggleInnerLabel.innerHTML = toggleName;
     // |-|-|-|
     const toggleContainer = window.parent.document.createElement('div');
-    toggleContainer.classList.add(['cls-sp-toggle-container']);
+    toggleContainer.classList.add('cls-sp-toggle-container');
     
     // |-|-|-|-|
     const toggleLabel = window.parent.document.createElement('label');
-    toggleLabel.classList.add(['cls-sp-toggle']);
+    toggleLabel.classList.add('cls-sp-toggle');
     toggleLabel.classList.toggle('cls-sp-toggle-checked', idIsChecked);
     // |-|-|-|-|-|
     const toggleInput = window.parent.document.createElement('input');
-    toggleInput.classList.add(['cls-sp-toggle-input']);
+    toggleInput.classList.add('cls-sp-toggle-input');
     toggleInput.type = 'checkbox';
     toggleInput.height = 12;
     toggleInput.width = 12;
     toggleInput.checked = idIsChecked;
-    toggleInput.onchange = CLS_Functions[toggleFunction].bind(this, cls_currentId, toggleClassName, cls_CurrentEditType, toggleLabel);
+    toggleInput.onchange = CLS_Functions[toggleFunction].bind(this, cls_currentId, toggleClassName, editType, toggleLabel);
     // |-|
     const toggleUnderLine = window.parent.document.createElement('div');
-    toggleUnderLine.classList.add(['cls-sp-toggle-under-line']);
+    toggleUnderLine.classList.add('cls-sp-toggle-under-line');
     // |-|-|
     const toggleUnderLineInner = window.parent.document.createElement('div');
-    toggleUnderLineInner.classList.add(['cls-sp-toggle-under-line-inner']);
+    toggleUnderLineInner.classList.add('cls-sp-toggle-under-line-inner');
 
     toggleInnerLabelContainer.appendChild(toggleInnerLabel);
 
@@ -761,6 +1008,9 @@ const CLS_CreateToggle = function (toggleName, toggleFunction, toggleClassName, 
     toggleInnerContainer.appendChild(toggleInnerLabelContainer);
     if(isDisabled) {
         toggleInnerContainer.appendChild(toggleLockedIcon);
+    }
+    if(isGloballyChecked) {
+        toggleInnerContainer.appendChild(toggleGlobalIcon);
     }
     toggleInnerContainer.appendChild(toggleContainer);
 
